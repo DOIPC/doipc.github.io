@@ -1,0 +1,1299 @@
+﻿/* =========================================================
+   字幕提词器 · 样式表
+        1. 基础重置 & 全局
+        2. 布局容器
+        3. 通用面板 & 标题
+        4. 文本输入区
+        5. 提示文字 & 快捷键
+        6. 按钮组 & 按钮
+        7. 语速 / 选项 / 尺寸 / 封面设置
+        8. 右侧录屏容器
+        9. 轻提示（Toast）
+       10. 降低动效偏好
+       11. 屏幕阅读器专用文字
+   ========================================================= */
+
+/* 1. 基础重置 & 全局 */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    /* 深色底：叠在 canvas 特效下方，作为兜底底色 */
+    background: radial-gradient(1100px 760px at 12% 8%, rgba(24, 40, 74, 0.95) 0%, rgba(24, 40, 74, 0) 62%), radial-gradient(900px 700px at 88% 88%, rgba(46, 22, 68, 0.9) 0%, rgba(46, 22, 68, 0) 62%), radial-gradient(1000px 1000px at 50% 45%, #0d1322 0%, #06070c 72%), #06070c;
+    background-attachment: fixed;
+    color: #fff;
+    padding: 40px;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* 1.1 背景特效画布（太阳系 + 科技感粒子 + 激光） */
+#bgCanvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* 1.2 沉浸模式：UI 外壳折叠容器
+    只用 max-height + opacity + transform + blur 过渡
+    不用 display:grid，避免引入新的布局上下文
+    不影响 .container 内部任何原有 grid 行为 */
+.ui-shell {
+    overflow: hidden;
+    max-height: 4000px; /* 足够容纳最大内容高度 */
+    transform-origin: top center;
+    transition: max-height 700ms cubic-bezier(0.22, 1, 0.36, 1), opacity 460ms ease, transform 700ms cubic-bezier(0.22, 1, 0.36, 1), filter 520ms ease;
+}
+
+    .ui-shell.is-hidden {
+        max-height: 0;
+        opacity: 0;
+        transform: translateY(-36px) scale(0.982);
+        filter: blur(7px);
+        pointer-events: none;
+    }
+
+/* 1.3 沉浸模式开关的对齐层
+    fixed 定位、水平居中、内层与主容器同宽（max-width:1500px）
+    只是把开关摆在主容器左上角，不参与文档流 */
+.immersive-dock {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 500;
+    padding: 40px;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+}
+
+    .immersive-dock > .dock-inner {
+        width: 100%;
+        max-width: 1500px;
+        display: flex;
+        justify-content: flex-start;
+        pointer-events: none;
+    }
+
+/* 1.4 沉浸模式切换开关 */
+#immersiveToggle {
+    margin-top: -20px;
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 15px;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1;
+    color: #cbd5e1;
+    white-space: nowrap;
+    cursor: pointer;
+    background: rgba(26, 28, 36, 0.55);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    transition: background 0.25s, border-color 0.25s, color 0.25s, transform 0.18s ease, box-shadow 0.25s;
+}
+
+    #immersiveToggle:hover {
+        background: rgba(56, 189, 248, 0.2);
+        border-color: rgba(56, 189, 248, 0.55);
+        color: #e0f2fe;
+        box-shadow: 0 8px 26px rgba(56, 189, 248, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    #immersiveToggle:active {
+        transform: scale(0.955);
+    }
+
+    #immersiveToggle:focus-visible {
+        outline: 2px solid rgba(56, 189, 248, 0.8);
+        outline-offset: 2px;
+    }
+
+    #immersiveToggle .ico {
+        display: block;
+        font-size: 15px;
+        line-height: 1;
+        transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #immersiveToggle[aria-pressed="true"] .ico {
+        transform: rotate(-18deg) scale(1.06);
+    }
+
+@media (max-width: 768px) {
+    .immersive-dock {
+        padding: 20px;
+    }
+
+    #immersiveToggle {
+        margin-top: -12px;
+        padding: 8px 13px;
+        font-size: 12px;
+    }
+}
+
+/* 2. 布局容器 */
+.container {
+    position: relative;
+    z-index: 1;
+    max-width: 1500px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    /* align-items: stretch（默认）保证两列等高 */
+}
+
+    .container > * {
+        min-width: 0;
+        min-height: 0;
+    }
+
+@media (max-width: 768px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 3. 通用面板 & 标题（毛玻璃半透明） */
+.panel {
+    background: rgba(26, 28, 36, 0.5);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+    .panel > * {
+        flex: 0 0 auto;
+    }
+
+h2 {
+    margin-bottom: 16px;
+    color: #e5e5e5;
+    font-size: 18px;
+}
+
+/* 3.1 面板头部：标题 + 折叠按钮（同一行） */
+.panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex: 0 0 auto;
+}
+
+    .panel-head > h2 {
+        margin-bottom: 0;
+    }
+
+/* 3.2 顶部可折叠区域：只收纳「操作提示 + 原文输入 + 章节分割开关
+    + 朗读语速 & 卡拉OK 开关 + 自动切分句子」五项 ——
+    音频文件 / 项目文件 / 录屏区外观 / 时间轴等保持独立，
+    折叠时不会被一起收起。 */
+#topFoldArea {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+    #topFoldArea.collapsed {
+        display: none;
+    }
+
+/* 3.3 通用折叠区域
+   用于把「录屏区外观」这类成组设置收纳起来，一键释放空间。
+   只靠 display:none 收起 —— 不引入新的布局上下文，
+   展开状态与普通区块完全一致，不会影响内部任何原有布局。 */
+.fold-region.collapsed {
+    display: none;
+}
+
+/* 3.4 折叠区域的标题行
+   与 .field-head 视觉一致，但作为「分组标题」使用，
+   因此顶部间距更大一些，用来和上一组设置拉开呼吸感。
+   该标题行本身不参与折叠 —— 按钮必须始终可见，
+   用户才能随时把收纳起来的设置重新展开。 */
+.group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 16px;
+    margin-bottom: 2px;
+}
+
+.group-title {
+    font-size: 13px;
+    color: #9a9a9a;
+    letter-spacing: 0.5px;
+}
+
+/* 4. 文本输入区 */
+textarea {
+    font-family: inherit;
+}
+
+#rawText,
+.time-line-editor,
+#exportTimeRule {
+    width: 100%;
+    padding: 12px;
+    background: rgba(38, 40, 48, 0.42);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.6;
+    transition: border-color 0.15s, background 0.15s;
+    /* 三个输入框都隐藏滚动条 —— 保留滚动能力，仅去掉视觉滚动条。
+        与右侧字幕区保持一致的"纯净滚动"体验。
+        Firefox / IE / Edge 用 scrollbar-width / -ms-overflow-style，
+        WebKit 用 ::-webkit-scrollbar 隐藏。 */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+    #rawText:focus,
+    .time-line-editor:focus,
+    #exportTimeRule:focus {
+        outline: none;
+        border-color: rgba(56, 189, 248, 0.6);
+        background: rgba(38, 44, 60, 0.55);
+    }
+
+    /* WebKit / Blink：隐藏滚动条 */
+    #rawText::-webkit-scrollbar,
+    .time-line-editor::-webkit-scrollbar,
+    #exportTimeRule::-webkit-scrollbar {
+        display: none;
+    }
+
+.time-line-editor {
+    min-height: 110px;
+    resize: vertical;
+}
+
+#exportTimeRule {
+    min-height: 110px;
+    background: rgba(18, 44, 34, 0.42);
+    color: #86efac;
+    border-color: rgba(52, 211, 153, 0.32);
+    resize: vertical;
+}
+
+/* 4.1 可折叠字段块 */
+.field-block {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin-top: 10px;
+}
+
+    /* 原文输入块：吸收面板多余高度 */
+    .field-block.grow {
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
+        .field-block.collapsed,
+        .field-block.grow.collapsed {
+            flex: 0 0 auto;
+            min-height: 0;
+        }
+
+            .field-block.collapsed > textarea {
+                display: none;
+            }
+
+        .field-block.grow > #rawText {
+            flex: 1 1 auto;
+            min-height: 110px;
+            resize: vertical;
+        }
+
+/* 字段块头部：标题 + 折叠按钮 */
+.field-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.field-title {
+    font-size: 12px;
+    color: #9a9a9a;
+    letter-spacing: 0.5px;
+}
+
+/* 折叠 / 展开按钮 */
+.fold-btn {
+    flex: 0 0 auto;
+    padding: 2px 10px;
+    background: rgba(56, 189, 248, 0.14);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 4px;
+    color: #7dd3fc;
+    font-size: 11px;
+    line-height: 1.6;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+    .fold-btn:hover {
+        background: rgba(56, 189, 248, 0.24);
+        border-color: rgba(56, 189, 248, 0.6);
+        color: #bae6fd;
+    }
+
+/* 5. 提示文字 & 快捷键 */
+.tip {
+    font-size: 12px;
+    color: #aaa;
+    margin: 0 0 8px;
+    line-height: 1.7;
+    flex: 0 0 auto;
+}
+
+kbd {
+    background: rgba(45, 47, 55, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 11px;
+    color: #ddd;
+}
+
+/* 6. 按钮组 & 按钮（半透明） */
+.btn-group {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+    .btn-group button {
+        width: 100%;
+        padding: 9px 4px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1.35;
+        color: #fff;
+        white-space: normal;
+        word-break: keep-all;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
+        transition: filter 0.15s, opacity 0.15s, transform 0.1s;
+    }
+
+        .btn-group button:hover:not(:disabled) {
+            filter: brightness(1.18);
+        }
+
+        .btn-group button:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+
+        .btn-group button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+/* 小屏降为 2 列 × 4 行，保证每格仍够宽 */
+@media (max-width: 768px) {
+    .btn-group {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+#playBtn {
+    background: rgba(37, 99, 235, 0.78);
+}
+
+#resetBtn {
+    background: rgba(102, 102, 102, 0.68);
+}
+
+#parseBtn {
+    background: rgba(5, 150, 105, 0.78);
+}
+
+#nextBtn {
+    background: rgba(147, 51, 234, 0.78);
+}
+
+#autoGenBtn {
+    background: rgba(217, 119, 6, 0.8);
+}
+
+#exportCopyBtn {
+    background: rgba(8, 145, 178, 0.78);
+}
+
+#recordBtn {
+    background: rgba(220, 38, 38, 0.82);
+}
+
+#playbackRecBtn {
+    background: rgba(20, 184, 166, 0.78);
+}
+
+/* 7. 语速 & 选项 & 尺寸选择 */
+.speed-row {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+    .speed-row label {
+        font-size: 13px;
+        color: #ccc;
+    }
+
+    .speed-row input {
+        width: 70px;
+        padding: 4px 6px;
+        background: rgba(38, 40, 48, 0.45);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 4px;
+    }
+
+/* 7.0 卡拉OK模式开关（跟在语速输入框后面，同一行右对齐） */
+.karaoke-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-left: auto;
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    color: #94a3b8;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    background: rgba(56, 189, 248, 0.10);
+    border: 1px solid rgba(56, 189, 248, 0.28);
+    border-radius: 999px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+    transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+    .karaoke-toggle:hover {
+        background: rgba(196, 181, 253, 0.18);
+        border-color: rgba(196, 181, 253, 0.5);
+        color: #ddd6fe;
+    }
+
+    .karaoke-toggle input[type="checkbox"] {
+        width: 14px;
+        height: 14px;
+        margin: 0;
+        accent-color: #c4b5fd; /* 雾紫-300 */
+        cursor: pointer;
+        flex: 0 0 auto;
+    }
+
+    /* 打开状态：整颗胶囊变紫 */
+    .karaoke-toggle.on {
+        background: rgba(196, 181, 253, 0.16);
+        border-color: rgba(196, 181, 253, 0.65);
+        color: #ddd6fe;
+        box-shadow: 0 0 14px rgba(167, 139, 250, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    }
+
+    .karaoke-toggle .kt-text {
+        display: block;
+    }
+
+.option-row {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: rgba(30, 32, 40, 0.4);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #ccc;
+    line-height: 1.55;
+}
+
+    .checkbox-label input[type="checkbox"] {
+        margin-top: 3px;
+        width: 15px;
+        height: 15px;
+        accent-color: #d97706;
+        cursor: pointer;
+        flex: 0 0 auto;
+    }
+
+    .checkbox-label .opt-hint {
+        display: block;
+        color: #888;
+        font-size: 12px;
+        margin-top: 2px;
+    }
+
+.size-row {
+    margin-top: 10px;
+}
+
+    .size-row > label {
+        font-size: 13px;
+        color: #ccc;
+        display: block;
+        margin-bottom: 6px;
+    }
+
+.size-select-wrap {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+#sizeSelect {
+    padding: 6px 8px;
+    background: rgba(38, 40, 48, 0.5);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+}
+
+.size-desc {
+    color: #86efac;
+    font-size: 13px;
+}
+
+/* 7.1 录屏区标题 / 底部署名 / 封面输入自定义 */
+.title-row {
+    margin-top: 10px;
+}
+
+    .title-row > label {
+        font-size: 13px;
+        color: #ccc;
+        display: block;
+        margin-bottom: 6px;
+    }
+
+#frameTitleInput,
+#frameFooterInput,
+#coverTitleInput,
+#coverSubInput {
+    width: 100%;
+    padding: 7px 9px;
+    background: rgba(38, 40, 48, 0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    line-height: 1.5;
+    transition: border-color 0.15s;
+}
+
+    #frameTitleInput:focus,
+    #frameFooterInput:focus,
+    #coverTitleInput:focus,
+    #coverSubInput:focus {
+        outline: none;
+        border-color: rgba(8, 145, 178, 0.75);
+    }
+
+/* 7.2 音频文件行 */
+.audio-file-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+
+.file-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 13px;
+    background: rgba(56, 189, 248, 0.16);
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    border-radius: 6px;
+    color: #7dd3fc;
+    font-size: 13px;
+    line-height: 1.4;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+    .file-btn:hover {
+        background: rgba(56, 189, 248, 0.28);
+        border-color: rgba(56, 189, 248, 0.75);
+        color: #e0f2fe;
+    }
+
+.audio-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 12px;
+    color: #9a9a9a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.mini-btn {
+    flex: 0 0 auto;
+    padding: 5px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+    background: rgba(148, 163, 184, 0.16);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 4px;
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+    .mini-btn:hover {
+        background: rgba(148, 163, 184, 0.3);
+        border-color: rgba(148, 163, 184, 0.6);
+    }
+
+/* 7.3 音量电平表 */
+.audio-meter {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(30, 32, 40, 0.4);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+}
+
+.meter-track {
+    position: relative;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.meter-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0%;
+    border-radius: 5px;
+    background: linear-gradient(90deg, #22d3ee, #38bdf8 55%, #a78bfa);
+    will-change: width;
+}
+
+.meter-thresh {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    left: 24%;
+    width: 2px;
+    background: #fbbf24;
+    box-shadow: 0 0 6px rgba(251, 191, 36, 0.9);
+    border-radius: 1px;
+}
+
+.meter-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 7px;
+    font-size: 12px;
+    color: #8b8b8b;
+}
+
+    .meter-meta input[type="range"] {
+        flex: 1 1 auto;
+        min-width: 0;
+        accent-color: #fbbf24;
+        cursor: pointer;
+    }
+
+.thresh-val {
+    flex: 0 0 auto;
+    color: #fbbf24;
+    font-variant-numeric: tabular-nums;
+    min-width: 24px;
+    text-align: right;
+}
+
+/* 7.4 播放进度控制（拖动滑块跳转到任意时间点）
+    —— 与「音量电平表」保持同一套毛玻璃卡片风格
+    —— 轨道填充由 JS 动态写入 background 渐变实现，
+        不依赖任何第三方 UI 库 */
+.progress-row {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: rgba(30, 32, 40, 0.4);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+}
+
+.progress-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 7px;
+}
+
+    .progress-head > label {
+        font-size: 13px;
+        color: #ccc;
+    }
+
+.progress-time {
+    font-size: 12px;
+    color: #8b8b8b;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    letter-spacing: 0.2px;
+}
+
+#progressRange {
+    display: block;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    /* 默认纯色轨道；播放 / 拖动时由 JS 覆写为「已播 + 未播」双色渐变 */
+    background: rgba(255, 255, 255, 0.10);
+    -webkit-appearance: none;
+    appearance: none;
+    /* 隐藏原生焦点圈，改用下方 focus-visible 描边 */
+    outline: none;
+    transition: box-shadow 0.2s;
+}
+
+    #progressRange:focus-visible {
+        box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.6);
+    }
+
+    /* WebKit / Blink：轨道透明，露出 input 自身的渐变背景 */
+    #progressRange::-webkit-slider-runnable-track {
+        height: 6px;
+        border-radius: 3px;
+        background: transparent;
+    }
+
+    #progressRange::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        margin-top: -4px;
+        border-radius: 50%;
+        background: linear-gradient(180deg, #bae6fd, #38bdf8);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.65), 0 2px 6px rgba(0, 0, 0, 0.45);
+        transition: transform 0.15s ease;
+    }
+
+        #progressRange::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+    #progressRange:active::-webkit-slider-thumb {
+        transform: scale(1.22);
+    }
+
+    /* Firefox：轨道透明，缩略图同款 */
+    #progressRange::-moz-range-track {
+        height: 6px;
+        border-radius: 3px;
+        background: transparent;
+    }
+
+    #progressRange::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: linear-gradient(180deg, #bae6fd, #38bdf8);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.65), 0 2px 6px rgba(0, 0, 0, 0.45);
+    }
+
+/* 8. 右侧录屏容器【状态灯与标题垂直居中】 */
+.record-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* 录屏外框：低透明度 + 低模糊，让背景粒子透得更明显 */
+.record-frame {
+    position: relative; /* 封面大标题层的定位基准 */
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    aspect-ratio: 9 / 16;
+    max-width: calc(90vh * 0.5625);
+    background: linear-gradient(145deg, rgba(38, 40, 48, 0.24), rgba(14, 15, 20, 0.36));
+    backdrop-filter: blur(7px) saturate(125%);
+    -webkit-backdrop-filter: blur(7px) saturate(125%);
+    border-radius: 16px;
+    padding: 24px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+    .record-frame h2 {
+        flex: 0 0 auto;
+        /* 标题过长时最多显示 2 行，避免挤压下方字幕区 */
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        overflow: hidden;
+        word-break: break-word;
+        /* 透明背景上保证标题清晰 */
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75);
+    }
+
+/* 顶部状态栏行：标题 + 状态指示灯，垂直居中对齐 */
+.frame-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex: 0 0 auto;
+    margin-bottom: 14px;
+}
+
+.frame-title-wrap {
+    flex: 1;
+}
+
+.record-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #bbb;
+    white-space: nowrap;
+    margin-top: 6px;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #444;
+    transition: background 0.25s;
+}
+
+    .status-dot.recording {
+        background: #ef4444;
+        box-shadow: 0 0 8px #ef4444;
+        animation: blink 1s infinite;
+    }
+
+    .status-dot.playing {
+        background: #3b82f6;
+        box-shadow: 0 0 6px #3b82f6;
+    }
+
+    .status-dot.idle {
+        background: #444;
+    }
+
+@keyframes blink {
+    0%, 100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.25;
+    }
+}
+
+.time-display {
+    margin-bottom: 14px;
+    font-size: 26px;
+    color: #38bdf8;
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    letter-spacing: 1px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-shadow: 0 0 18px rgba(56, 189, 248, 0.45), 0 2px 10px rgba(0, 0, 0, 0.9);
+}
+
+.time-label {
+    font-size: 13px;
+    color: #8b8b8b;
+    font-weight: normal;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+}
+
+/* 回放模式标识 */
+.time-display.replay-mode {
+    color: #14b8a6;
+    text-shadow: 0 0 18px rgba(20, 184, 166, 0.45), 0 2px 10px rgba(0, 0, 0, 0.9);
+}
+
+/* 字幕区：几乎全透，只留极淡黑纱与轻微模糊 */
+.subtitle-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    padding: 24px 20px;
+    background: rgba(0, 0, 0, 0.11);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+    .subtitle-wrap::-webkit-scrollbar {
+        display: none;
+    }
+
+/* 8.0 字幕条目：inline 排布 —— 同一章节内的句子像一整段连续文本，
+    没有换行、没有额外间距，只在容器宽度处自然折行。
+    注意：这里的"放大"效果已下移到"字符级"（见 .ch），
+    因此本层本身不参与任何缩放、不做 font-size 变化，
+    折行、位移完全稳定。 */
+.subtitle-item {
+    display: inline;
+    padding: 0;
+    font-size: 20px;
+    line-height: 1.7;
+    color: #8d8d8d;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9), 0 0 26px rgba(0, 0, 0, 0.75);
+    transition: color 0.25s, text-shadow 0.25s, font-weight 0.18s ease-out;
+    word-break: break-word;
+}
+
+    /* 8.0.1 章节高亮：当某章节被激活时，该章节内的所有句子一起变白、
+        加粗、发光 —— 形成"整段一起亮起"的效果，
+        字体放大交给下方 .ch 的字符级 transform（不参与布局），
+        因此不会引起字幕区重新折行、位移。
+        这是"章节一起高亮"的核心样式，用于【播放模式】。 */
+    .subtitle-item.chapter-active {
+        color: #fff;
+        font-weight: 700;
+        text-shadow: 0 0 22px rgba(255, 255, 255, 0.4), 0 2px 12px rgba(0, 0, 0, 1), 0 0 40px rgba(0, 0, 0, 0.85);
+    }
+
+    /* 8.0.2 单字包裹层：
+        · 必须用 inline-block（而不是 inline），因为 inline 元素
+            不支持 transform；改成 inline-block 后，字符仍然像
+            inline 一样在同一行自然流动，保留"整句连续文本"的观感。
+        · transform 不参与布局计算，所以缩放不会引起重排、
+            不会让相邻文字换行、位移 —— 这是本方案最关键的地方。
+        · transform-origin 使用默认中心（50% 50%），与旧版
+            transform: scale(1.02) 的整句居中放大视觉一致。 */
+    .subtitle-item .ch {
+        display: inline-block;
+        white-space: pre; /* 保留空格字符本身 */
+        color: inherit;
+        transform-origin: 50% 50%;
+        transition: color 0.22s ease-out, text-shadow 0.3s ease-out, transform 0.25s ease;
+    }
+
+    /* 8.0.3 卡拉OK逐字变色：只在"当前正在朗读的那一句"（.current）上生效。
+        整章节虽然一起高亮，但逐字推进只走当前句 —— 已读过的字变紫色发光，
+        未读的字保持整句高亮的白色，与整章节高亮自然融合。 */
+    .subtitle-item.current .ch.lit {
+        color: #c4b5fd; /* 雾紫-300 */
+        text-shadow: 0 0 10px rgba(196, 181, 253, 0.5), 0 0 24px rgba(167, 139, 250, 0.22), 0 2px 10px rgba(0, 0, 0, 0.9);
+    }
+
+    /* 8.0.4 卡拉OK模式下，同一章节中「已经读过的整句」保持紫色。
+        不能依赖 .chapter-active ——
+        【录制模式】下 setActive 会清空所有 .chapter-active
+        （只保留当前句的 .current），若把 .read-past 的样式挂在
+        .chapter-active 之下，录制时已读句子就永远不会变紫。
+
+        必须和 .current 一样带上 transform: scale(1.02) ——
+        否则从「当前句」切换为「已读句」时，transform 会从 1.02
+        启动过渡回 1.0，字符会先缩小一段再稳定，视觉上就是
+        「字先变小一下」的闪烁。让两者尺寸一致，过渡就不会被触发，
+        从白转紫的过程干净无抖动。 */
+    .subtitle-item.read-past {
+        color: #c4b5fd;
+        font-weight: 700;
+        text-shadow: 0 0 12px rgba(196, 181, 253, 0.42), 0 0 28px rgba(167, 139, 250, 0.22), 0 2px 12px rgba(0, 0, 0, 1);
+    }
+
+        .subtitle-item.read-past .ch {
+            color: #c4b5fd;
+            /* 与 .current .ch 保持同一放大比例：
+                从当前句变为已读句时 transform 值不变，过渡不会被触发，
+                不会出现「先缩小再恢复」的抖动 */
+            transform: scale(1.02);
+        }
+
+    /* 8.0.5 当前焦点句（.current）：
+        用于【录制模式】—— 此时不整章节高亮，只让当前句以
+        白色 + 发光 单独亮起，形成"逐句推进"的效果。
+        字体放大同样由下方 .ch 的字符级 transform 承担。 */
+    .subtitle-item.current {
+        color: #fff;
+        font-weight: 700;
+        text-shadow: 0 0 22px rgba(255, 255, 255, 0.4), 0 2px 12px rgba(0, 0, 0, 1), 0 0 40px rgba(0, 0, 0, 0.85);
+    }
+
+        /* 8.0.6 字符级轻微放大：
+            当所属句子处于"章节高亮"或"当前焦点"状态时，
+            让该句里的每个字符以自身中心轻微放大 2% ——
+            视觉上等价于原版 transform: scale(1.02) 的整句放大，
+            但因为 transform 不参与布局计算，字幕折行、位移完全不变。
+
+            注意：这里用后代选择器 .subtitle-item.xxx .ch，
+            意味着放大只对处于激活状态的句子生效；
+            非激活状态的字符保持原始尺寸，与原本的灰色小字观感一致。 */
+        .subtitle-item.chapter-active .ch,
+        .subtitle-item.current .ch {
+            transform: scale(1.02);
+        }
+
+/* 8.1 章节容器：块级元素 —— 每个章节从新的一行开始，
+    章节内部句子 inline 排布、彼此首尾相接，章节之间换行。
+    无边框、无内边距、无章节标签，只靠块级换行 + 明显的顶部间距，
+    表达"这是一段新内容"的段落感。 */
+.subtitle-chapter {
+    padding: 0;
+    margin: 0;
+    line-height: 1.7;
+}
+
+    /* 章节之间：保持换行样式（新章节另起一行），
+        并留出较大的间距，让分段感清晰、呼吸感更强 */
+    .subtitle-chapter + .subtitle-chapter {
+        margin-top: 1.6em;
+    }
+
+/* 8.2 底部署名 / 版权栏（面向观众展示，可按需自定义或留空隐藏） */
+.frame-footer {
+    margin-top: 14px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 9px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+}
+
+/* 署名两侧的装饰细线 */
+.footer-deco {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.38));
+}
+
+    .footer-deco:last-child {
+        transform: scaleX(-1);
+    }
+
+/* 署名 / 版权文字 */
+.footer-text {
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.55;
+    letter-spacing: 0.6px;
+    color: #9d9d9d;
+    text-align: center;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+}
+
+/* 8.3 封面大标题层
+   —— 绝对定位铺满整个录屏区，内容垂直水平居中
+   —— 只在需要拍封面时显示，打开后时间 / 字幕自动淡出，
+      让超大标题成为画面唯一焦点
+   —— 字号由 JS 按录屏区宽度实时计算，写入 --cover-title-size，
+      保证 9:16 / 4:5 / 1:1 / 16:9 各比例下"超大"程度一致 */
+.cover-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(var(--cover-title-size, 54px) * 0.24);
+    padding: 34px 26px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.965);
+    transition: opacity 0.42s ease, transform 0.58s cubic-bezier(0.22, 1, 0.36, 1);
+    /* 极淡的径向暗角：让超大文字从背景粒子中浮出来，又不挡住星空 */
+    background: radial-gradient(72% 54% at 50% 50%, rgba(4, 6, 12, 0.62) 0%, rgba(4, 6, 12, 0.34) 46%, rgba(4, 6, 12, 0) 80%);
+}
+
+    .cover-overlay.show {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+/* 主标题：超大、白色、带冷调辉光 */
+.cover-title {
+    max-width: 100%;
+    font-size: var(--cover-title-size, 54px);
+    font-weight: 800;
+    line-height: 1.3;
+    letter-spacing: 0.05em;
+    color: #fff;
+    word-break: break-word;
+    text-shadow: 0 0 34px rgba(125, 211, 252, 0.42), 0 4px 26px rgba(0, 0, 0, 0.95), 0 0 70px rgba(0, 0, 0, 0.8);
+}
+
+/* 副标题：作者 / 年代 / 出处，字号随主标题等比缩放 */
+.cover-sub {
+    max-width: 100%;
+    font-size: calc(var(--cover-title-size, 54px) * 0.3);
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: 0.26em;
+    text-indent: 0.26em; /* 抵消字间距造成的整体右偏 */
+    color: #a5d8ff;
+    word-break: break-word;
+    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.95);
+}
+
+/* 封面开启时：头部 / 时间 / 字幕自动淡出，保证封面干净 */
+.record-frame .frame-header-row,
+.record-frame .time-display,
+.record-frame .subtitle-wrap {
+    transition: opacity 0.42s ease;
+}
+
+.record-frame.cover-on .frame-header-row,
+.record-frame.cover-on .time-display {
+    opacity: 0.08;
+}
+
+.record-frame.cover-on .subtitle-wrap {
+    opacity: 0.07;
+}
+
+/* 9. 轻提示（Toast） */
+#toast {
+    position: fixed;
+    left: 50%;
+    bottom: 32px;
+    transform: translate(-50%, 12px);
+    background: rgba(24, 26, 32, 0.86);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #e5e5e5;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 999;
+    max-width: 80vw;
+    text-align: center;
+}
+
+    #toast.show {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+
+/* 10. 降低动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+    .status-dot.recording {
+        animation: none;
+    }
+}
+
+/* 11. 屏幕阅读器专用文字（不影响视觉） */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

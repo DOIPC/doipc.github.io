@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>&#x6717;&#x8BFB;/&#x7A3F;&#x4EF6; | &#x5B57;&#x5E55;&#x63D0;&#x8BCD;&#x5668;</title>
+
+    <link rel="stylesheet" href="css/teleprompter.css?v=8I7jcFhG0t_S8DNjsU81Dej-m7_RFLYno3HiWSmY3h0" />
+</head>
+
+<body>
+    <!-- 背景特效层：太阳系 + 科技感粒子 + 暗黑激光（不参与交互） -->
+    <canvas id="bgCanvas" aria-hidden="true"></canvas>
+
+    <!-- 沉浸模式开关的对齐层：与主容器左上角严格对齐 -->
+    <div class="immersive-dock">
+        <div class="dock-inner">
+            <button type="button"
+                    id="immersiveToggle"
+                    aria-pressed="false"
+                    aria-controls="uiShell"
+                    title="隐藏界面，仅欣赏星空">
+                <span class="ico" id="immersiveIcon" aria-hidden="true">🌌</span>
+                <span id="immersiveText">沉浸模式</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- UI 外壳：只用 max-height 收缩，不改动内部布局 -->
+    <div class="ui-shell" id="uiShell">
+        <div class="container">
+
+            <!-- 左侧：文本 & 时间轴编辑区 -->
+            <div class="panel">
+                <!-- 面板头部：标题 + 第一个折叠按钮
+                —— 该按钮只折叠「操作提示 + 原文输入 + 章节分割开关
+                    + 朗读语速 / 卡拉OK 开关 + 自动切分句子」五项；
+                    音频文件 / 项目文件 / 录屏区外观 / 时间轴等保持独立，
+                    不会被一起收起。 -->
+                <div class="panel-head">
+                    <h2>文本 &amp; 时间轴编辑</h2>
+                    <button type="button" class="fold-btn"
+                            data-target="topFoldArea"
+                            aria-expanded="true">
+                        收起
+                    </button>
+                </div>
+
+                <!-- 顶部可折叠区域：只收纳最基础的输入与开关 -->
+                <div id="topFoldArea">
+                    <div class="tip">
+                        粘贴原文 → 点【自动生成时序】生成初始字幕 → 点【解析字幕】加载预览 →
+                        （可选）打开音频文件 → 点【录制】开始计时，听到旁白点【下一句】记录时间戳 →
+                        点【回放录制】验证节拍
+                    </div>
+
+                    <!-- 原文输入块（无独立折叠按钮，随顶部区域一起折叠） -->
+                    <div class="field-block grow" id="rawTextBlock">
+                        <label class="sr-only" for="rawText">原文输入</label>
+                        <textarea id="rawText" placeholder="粘贴完整原文，用于自动生成字幕时序&#10;空行 = 章节分隔（可用下方开关关闭该行为）"></textarea>
+                    </div>
+
+                    <!-- ========== 章节分割开关（放在输入框下方，随顶部区域一起折叠） ========== -->
+                    <div class="option-row">
+                        <label class="checkbox-label" for="chapterSplitCheck">
+                            <input type="checkbox" id="chapterSplitCheck" checked>
+                            <span>
+                                将空行识别为独立章节
+                                <span class="opt-hint">
+                                    打开（默认）：时间轴 / 原文中的空行 = 章节分隔。同一章节的字幕在预览区
+                                    连续显示，章节之间保持换行；播放时整章节一起高亮放大，卡拉OK逐字
+                                    变色只在当前句内推进
+                                    <br>
+                                    关闭：忽略空行，全部字幕视为同一章节
+                                </span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <!-- 语速行：语速输入 + 推荐提示 + 卡拉OK模式开关（右对齐） -->
+                    <div class="speed-row">
+                        <label for="speedInput">朗读语速(字/秒):</label>
+                        <input id="speedInput" type="number" value="3.8" step="0.1" min="0.8" max="10">
+                        <span style="color:#aaa;font-size:12px">推荐旁白：3.0~4.5</span>
+
+                        <!-- 卡拉OK模式开关：开启后当前句已读的字逐个变紫色；关闭时整句一起高亮 -->
+                        <label class="karaoke-toggle" id="karaokeToggleLabel"
+                               title="开启后，当前句已读到的字会逐个变成紫色；关闭时保持原来的整句高亮">
+                            <input type="checkbox" id="karaokeToggle">
+                            <span class="kt-text">卡拉OK模式</span>
+                        </label>
+                    </div>
+
+                    <div class="option-row">
+                        <label class="checkbox-label" for="autoSplitCheck">
+                            <input type="checkbox" id="autoSplitCheck">
+                            <span>
+                                自动切分句子
+                                <span class="opt-hint">
+                                    关闭（默认）：仅按换行切分，长句由您手动回车控制
+                                    <br>
+                                    打开：按句末标点切分，长句再按逗号等二次切分
+                                </span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- ========== 音频文件（可选 · 用于跟随音频打点）
+                     独立区块，不随任何折叠区一起收起 ========== -->
+                <div class="title-row">
+                    <label>音频文件（可选 · 用于跟随音频打点）</label>
+                    <div class="audio-file-row">
+                        <label class="file-btn" for="audioFileInput">
+                            <span>🎵</span><span>打开音频文件</span>
+                        </label>
+                        <input type="file" id="audioFileInput" accept="audio/*" hidden>
+                        <span class="audio-name" id="audioName">未选择音频</span>
+                        <button type="button" class="mini-btn" id="audioClearBtn" title="清除已加载的音频">清除</button>
+                    </div>
+
+                    <!-- 音量电平表 -->
+                    <div class="audio-meter">
+                        <div class="meter-track">
+                            <div class="meter-fill" id="meterFill"></div>
+                            <div class="meter-thresh" id="meterThresh"></div>
+                        </div>
+                        <div class="meter-meta">
+                            <label for="threshRange">灵敏度</label>
+                            <input type="range" id="threshRange" min="1" max="100" value="15">
+                            <span class="thresh-val" id="threshVal">15</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 监听声音自动打点（与音频文件同属"音频相关"，独立区块） -->
+                <div class="option-row">
+                    <label class="checkbox-label" for="soundTapCheck">
+                        <input type="checkbox" id="soundTapCheck">
+                        <span>
+                            监听声音自动打点
+                            <span class="opt-hint">
+                                录制时检测到「开口说话」，自动记录时间戳并切到下一句（需先加载音频）
+                            </span>
+                        </span>
+                    </label>
+                </div>
+
+                <!-- ========== 项目文件：把原文 / 音频 / 字幕 / 校准结果 / 设置
+                     打包保存为单个 .tqproj 文件，后期一键载入还原现场（独立区块） ========== -->
+                <div class="title-row">
+                    <label>项目文件（原文 / 音频 / 字幕 / 校准结果 / 设置）</label>
+                    <div class="audio-file-row">
+                        <label class="file-btn" for="projectOpenInput">
+                            <span>📂</span><span>打开项目</span>
+                        </label>
+                        <input type="file" id="projectOpenInput"
+                               accept=".tqproj,application/octet-stream" hidden>
+                        <span class="audio-name" id="projectName">未选择项目</span>
+                        <button type="button" class="mini-btn" id="projectSaveBtn"
+                                title="把当前全部内容打包保存为 .tqproj 文件">
+                            保存项目
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ========== 录屏区外观（独立折叠分组，默认折叠）
+                     收纳：录屏窗口尺寸预设 / 录屏区标题 / 底部署名 / 封面大标题 /
+                     封面副标题 / 显示封面开关 / 封面字号 ——
+                     这些设置都属于"录屏区看起来是什么样"，与文本编辑逻辑无关。
+                     默认折叠，一次性释放高度；
+                     音频 / 项目 / 时间轴 / 进度条 / 按钮组全部不受影响。
+                     需要时点右上角「展开」即可调出全部外观选项。 ========== -->
+                <div class="group-head">
+                    <span class="group-title">录屏区外观（尺寸 / 标题 / 署名 / 封面）</span>
+                    <button type="button" class="fold-btn"
+                            data-target="recordStyleFoldArea"
+                            aria-expanded="false">
+                        展开
+                    </button>
+                </div>
+
+                <div class="fold-region collapsed" id="recordStyleFoldArea">
+
+                    <!-- 录屏窗口尺寸预设 -->
+                    <div class="size-row">
+                        <label for="sizeSelect">录屏窗口尺寸预设（平台比例）</label>
+                        <div class="size-select-wrap">
+                            <select id="sizeSelect">
+                                <option value="9:16|1080|1920">抖音/视频号竖版 9:16｜1080×1920</option>
+                                <option value="4:5|1080|1350">小红书 4:5｜1080×1350</option>
+                                <option value="1:1|1080|1080">正方形 1:1｜1080×1080</option>
+                                <option value="16:9|1920|1080">B站/横版 16:9｜1920×1080</option>
+                                <option value="2.35:1|1920|817">电影宽屏 2.35:1｜1920×817</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                            <div class="size-desc" id="sizeDesc">比例：9:16｜画布：1080 × 1920</div>
+                        </div>
+                    </div>
+
+                    <!-- 录屏区标题自定义 -->
+                    <div class="title-row">
+                        <label for="frameTitleInput">录屏区标题（自定义）</label>
+                        <input id="frameTitleInput"
+                               type="text"
+                               maxlength="60"
+                               autocomplete="off"
+                               spellcheck="false"
+                               value="观自在，各安其时｜二十年心事，终成一句云淡风轻"
+                               placeholder="输入录屏区顶部标题，留空则隐藏标题">
+                    </div>
+
+                    <!-- 录屏区底部署名 / 版权自定义 -->
+                    <div class="title-row">
+                        <label for="frameFooterInput">录屏区底部署名 / 版权（自定义）</label>
+                        <input id="frameFooterInput"
+                               type="text"
+                               maxlength="80"
+                               autocomplete="off"
+                               spellcheck="false"
+                               value="© 2026 非常奈斯 · 版权所有 · 转载请注明出处"
+                               placeholder="输入作者 / 版权信息，留空则隐藏该栏">
+                    </div>
+
+                    <!-- 封面大标题（居中叠加在录屏区） -->
+                    <div class="title-row">
+                        <label for="coverTitleInput">封面大标题（居中叠加在录屏区）</label>
+                        <input id="coverTitleInput"
+                               type="text"
+                               maxlength="40"
+                               autocomplete="off"
+                               spellcheck="false"
+                               value=""
+                               placeholder="例如：观自在，各安其时">
+                    </div>
+
+                    <!-- 封面副标题（作者 / 年代 / 出处，可留空） -->
+                    <div class="title-row">
+                        <label for="coverSubInput">封面副标题（作者 / 年代 / 出处，可留空）</label>
+                        <input id="coverSubInput"
+                               type="text"
+                               maxlength="40"
+                               autocomplete="off"
+                               spellcheck="false"
+                               value=""
+                               placeholder="例如：苏轼 · 北宋 · 元丰六年">
+                    </div>
+
+                    <!-- 显示封面大标题开关 -->
+                    <div class="option-row">
+                        <label class="checkbox-label" for="coverToggleCheck">
+                            <input type="checkbox" id="coverToggleCheck">
+                            <span>
+                                显示封面大标题
+                                <span class="opt-hint">
+                                    打开：超大标题 / 副标题居中叠加在录屏区，时间与字幕自动淡出，
+                                    画面只留标题，适合拍小红书 / 抖音视频封面
+                                    <br>
+                                    关闭：恢复常规提词预览
+                                    <br>
+                                    ※ 点【录制】时会自动显示封面（方便拍开头）；
+                                    点【下一句】开始打点时会自动隐藏封面，露出字幕；
+                                    播放 / 录制结束后不再自动改写该开关，交回手动控制
+                                </span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <!-- 封面标题字号缩放 -->
+                    <div class="size-row">
+                        <label for="coverScaleRange">封面标题字号</label>
+                        <div class="size-select-wrap">
+                            <input type="range" id="coverScaleRange"
+                                   min="60" max="180" step="5" value="100"
+                                   style="flex:1 1 auto;min-width:0;accent-color:#38bdf8;cursor:pointer;">
+                            <span class="size-desc" id="coverScaleVal">100%</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- 原始时间轴块（默认折叠，需要时展开） -->
+                <div class="field-block collapsed" id="timeRuleBlock">
+                    <div class="field-head">
+                        <span class="field-title">原始时间轴</span>
+                        <button type="button" class="fold-btn"
+                                data-target="timeRuleBlock"
+                                aria-expanded="false">
+                            展开
+                        </button>
+                    </div>
+                    <label class="sr-only" for="timeRule">原始时间轴</label>
+                    <textarea class="time-line-editor"
+                              id="timeRule"
+                              placeholder="自动生成或手动填写原始时间轴&#10;00:00:00.000|开篇第一句话&#10;00:00:05.000|接下来的内容&#10;&#10;（空行 = 章节分隔）"></textarea>
+                </div>
+
+                <!-- 校准输出块（默认折叠，需要时展开） -->
+                <div class="field-block collapsed" id="exportTimeRuleBlock">
+                    <div class="field-head">
+                        <span class="field-title">校准输出 | 快捷键：<kbd>空格</kbd> = 下一句</span>
+                        <button type="button" class="fold-btn"
+                                data-target="exportTimeRuleBlock"
+                                aria-expanded="false">
+                            展开
+                        </button>
+                    </div>
+                    <label class="sr-only" for="exportTimeRule">校准输出时间轴</label>
+                    <textarea id="exportTimeRule"
+                              readonly
+                              placeholder="点击下一句校准后，更新后的时间轴会生成在这里"></textarea>
+                </div>
+
+                <!-- ========== 播放进度控制（独立区块）
+                拖动滑块可跳转到任意时间点：
+                · 有音频时直接写 audioEl.currentTime，声画同步
+                · 无音频时改写虚拟计时基准，进度同样连续
+                播放 / 回放 / 录制过程中实时跟随，
+                字幕高亮、时间文字、进度条三者同步更新 ========== -->
+                <div class="progress-row">
+                    <div class="progress-head">
+                        <label for="progressRange">播放进度</label>
+                        <span class="progress-time" id="progressTime">00:00:00 / 00:00:00</span>
+                    </div>
+                    <input type="range" id="progressRange"
+                           min="0" max="1000" step="1" value="0"
+                           aria-label="播放进度，拖动可跳转">
+                </div>
+
+                <!-- 按钮组：4 列 × 2 行，等宽对齐 -->
+                <div class="btn-group">
+                    <!-- 第 1 行 -->
+                    <button type="button" id="autoGenBtn">自动生成时序</button>
+                    <button type="button" id="parseBtn">解析字幕</button>
+                    <button type="button" id="recordBtn">录制</button>
+                    <button type="button" id="playBtn">播放</button>
+
+                    <!-- 第 2 行 -->
+                    <button type="button" id="nextBtn">下一句</button>
+                    <button type="button" id="playbackRecBtn" title="按录制后的时间轴重新播放，验证节拍是否正确">回放录制</button>
+                    <button type="button" id="exportCopyBtn">复制校准字幕</button>
+                    <button type="button" id="resetBtn">重置</button>
+                </div>
+            </div>
+
+            <!-- 右侧：录屏 / 字幕预览区 -->
+            <div class="record-col">
+                <div class="record-frame" id="recordFrame">
+                    <!-- 头部：标题 + 录制状态灯 -->
+                    <div class="frame-header-row">
+                        <div class="frame-title-wrap">
+                            <h2 id="frameTitle">观自在，各安其时｜二十年心事，终成一句云淡风轻</h2>
+                        </div>
+                        <div class="record-status-indicator" aria-live="polite">
+                            <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+                            <span id="statusText">待机</span>
+                        </div>
+                    </div>
+                    <!-- 时间行：标签+时间 -->
+                    <div class="time-display" id="currentTime">
+                        <span class="time-label">当前时间</span>
+                        <span>00:00:00</span>
+                    </div>
+                    <div class="subtitle-wrap" id="subtitleBox" aria-live="polite"></div>
+                    <!-- 底部署名 / 版权（面向观众展示，内容可在左侧自定义） -->
+                    <div class="frame-footer" id="frameFooter">
+                        <span class="footer-deco" aria-hidden="true"></span>
+                        <span class="footer-text" id="footerText">© 2026 非常奈斯 · 版权所有 · 转载请注明出处</span>
+                        <span class="footer-deco" aria-hidden="true"></span>
+                    </div>
+
+                    <!-- 封面大标题层：铺满录屏区，内容垂直水平居中（仅封面模式显示） -->
+                    <div class="cover-overlay" id="coverOverlay" aria-hidden="true">
+                        <div class="cover-title" id="coverTitleDom"></div>
+                        <div class="cover-sub" id="coverSubDom"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 脚本按顺序加载：背景特效 → 沉浸模式 → 主逻辑（均使用 defer，DOM 就绪后按序执行） -->
+    <script src="js/teleprompter/background-fx.js?v=UmZnH9Baq-zy7tWyDYhi_5MFkBnbJoAtKWMCRBPPj88" defer></script>
+    <script src="js/teleprompter/immersive.js?v=Jx7FWkdSLXAZBRM4T9rR9acNU6kVJU0IKUI5kn4Yfdo" defer></script>
+    <script src="js/teleprompter/main.js?v=R5AXSwK6DK8bIeMtzDpVI2QZUlwFOSh2jCca8QFBPPo" defer></script>
+</body>
+</html>
